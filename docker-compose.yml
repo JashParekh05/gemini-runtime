@@ -1,0 +1,204 @@
+services:
+  # ── infrastructure ─────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: gemini_runtime
+      POSTGRES_USER: runtime
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U runtime -d gemini_runtime"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./infra/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+
+  # ── services ───────────────────────────────────────────────────────────────────
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: services/orchestrator/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://runtime:${POSTGRES_PASSWORD:-changeme}@postgres:5432/gemini_runtime
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://runtime:${POSTGRES_PASSWORD:-changeme}@postgres:5432/gemini_runtime
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "9000"
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  analytics:
+    build:
+      context: .
+      dockerfile: services/analytics/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "9000"
+      DATABASE_URL: postgresql+asyncpg://runtime:${POSTGRES_PASSWORD:-changeme}@postgres:5432/gemini_runtime
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      ORCHESTRATOR_URL: http://orchestrator:8001
+      ANALYTICS_URL: http://analytics:8003
+      INGESTION_URL: http://ingestion:8002
+      REDIS_URL: redis://redis:6379
+      API_KEY: ${API_KEY:-dev-key}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      - orchestrator
+      - analytics
+    restart: unless-stopped
+
+  worker_planner:
+    build:
+      context: .
+      dockerfile: services/agent_worker/Dockerfile
+    environment:
+      AGENT_ROLE: planner
+      REDIS_URL: redis://redis:6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      DATABASE_URL: postgresql+asyncpg://runtime:${POSTGRES_PASSWORD:-changeme}@postgres:5432/gemini_runtime
+      INGESTION_URL: http://ingestion:8002
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker_researcher:
+    build:
+      context: .
+      dockerfile: services/agent_worker/Dockerfile
+    environment:
+      AGENT_ROLE: researcher
+      REDIS_URL: redis://redis:6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      WORKSPACE_ROOT: /workspace
+      INGESTION_URL: http://ingestion:8002
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./workspace:/workspace:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+
+  worker_executor:
+    build:
+      context: .
+      dockerfile: services/agent_worker/Dockerfile
+    environment:
+      AGENT_ROLE: executor
+      REDIS_URL: redis://redis:6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      WORKSPACE_ROOT: /workspace
+      INGESTION_URL: http://ingestion:8002
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./workspace:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker_verifier:
+    build:
+      context: .
+      dockerfile: services/agent_worker/Dockerfile
+    environment:
+      AGENT_ROLE: verifier
+      REDIS_URL: redis://redis:6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      WORKSPACE_ROOT: /workspace
+      INGESTION_URL: http://ingestion:8002
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./workspace:/workspace:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  clickhouse_data:
