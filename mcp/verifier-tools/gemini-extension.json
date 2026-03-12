@@ -1,0 +1,11 @@
+{
+  "name": "verifier-tools",
+  "version": "0.1.0",
+  "description": "Test and analysis tools for the verifier agent role",
+  "mcpServers": {
+    "verifier-tools": {
+      "command": "node",
+      "args": ["./mcp/verifier-tools/dist/index.js"]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "executor-tools",
+  "version": "0.1.0",
+  "description": "Code implementation tools for the executor agent role",
+  "mcpServers": {
+    "executor-tools": {
+      "command": "node",
+      "args": ["./mcp/executor-tools/dist/index.js"]
+    }
+  }
+}

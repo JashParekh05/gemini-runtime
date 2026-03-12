@@ -1,0 +1,11 @@
+{
+  "name": "planner-tools",
+  "version": "0.1.0",
+  "description": "Task decomposition tools for the planner agent role",
+  "mcpServers": {
+    "planner-tools": {
+      "command": "node",
+      "args": ["./mcp/planner-tools/dist/index.js"]
+    }
+  }
+}

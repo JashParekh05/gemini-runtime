@@ -1,0 +1,11 @@
+{
+  "name": "researcher-tools",
+  "version": "0.1.0",
+  "description": "Codebase research tools for the researcher agent role",
+  "mcpServers": {
+    "researcher-tools": {
+      "command": "node",
+      "args": ["./mcp/researcher-tools/dist/index.js"]
+    }
+  }
+}
