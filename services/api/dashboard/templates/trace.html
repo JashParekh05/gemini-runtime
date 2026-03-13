@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Trace — {{ session_id[:8] }} — gemini-runtime{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+  <a href="/">← sessions</a>
+  <h1 style="margin:0">Session <span class="mono">{{ session_id }}</span></h1>
+  <a href="/sessions/{{ session_id }}/replay" style="margin-left:auto">replay →</a>
+</div>
+
+<div class="grid4" id="cost-strip" style="margin-bottom:16px"></div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Latency by tool (p95)</h2>
+    <table id="latency-table">
+      <thead><tr><th>Tool</th><th>Role</th><th>p50</th><th>p95</th><th>p99</th><th>Calls</th><th>Errors</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>Event trace</h2>
+    <div id="trace-list" style="max-height:500px;overflow-y:auto"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SESSION_ID = "{{ session_id }}";
+
+const roleColor = {planner:'#58a6ff',researcher:'#3fb950',executor:'#e3b341',verifier:'#f78166'};
+const eventIcon = {
+  session_started:'▶',tool_call_started:'⚙',tool_call_finished:'✓',
+  tool_call_failed:'✗',agent_handoff:'→',session_completed:'■',session_failed:'■'
+};
+
+async function load() {
+  const [cost, latency, trace] = await Promise.all([
+    fetch(`/api/v1/sessions/${SESSION_ID}/cost`).then(r=>r.json()),
+    fetch(`/api/v1/sessions/${SESSION_ID}/latency`).then(r=>r.json()),
+    fetch(`/api/v1/sessions/${SESSION_ID}/trace`).then(r=>r.json()),
+  ]);
+
+  // cost strip
+  document.getElementById('cost-strip').innerHTML = [
+    ['Total Cost', `$${(cost.total_cost_usd||0).toFixed(5)}`],
+    ['Total Tokens', (cost.total_tokens||0).toLocaleString()],
+    ['Tool Calls', cost.total_tool_calls||0],
+    ['Failures', cost.failed_tool_calls||0],
+  ].map(([label,val])=>`
+    <div class="card" style="margin:0">
+      <div class="stat-value" style="font-size:20px">${val}</div>
+      <div class="stat-label">${label}</div>
+    </div>
+  `).join('');
+
+  // latency table
+  const tbody = document.querySelector('#latency-table tbody');
+  tbody.innerHTML = latency.map(r=>`
+    <tr>
+      <td>${r.tool_name}</td>
+      <td><span style="color:${roleColor[r.agent_role]||'#e6edf3'}">${r.agent_role}</span></td>
+      <td>${(r.p50||0).toFixed(0)}ms</td>
+      <td>${(r.p95||0).toFixed(0)}ms</td>
+      <td>${(r.p99||0).toFixed(0)}ms</td>
+      <td>${r.total_calls}</td>
+      <td>${r.failed_calls}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="7" style="color:#8b949e;text-align:center">No data</td></tr>';
+
+  // event trace
+  const list = document.getElementById('trace-list');
+  list.innerHTML = trace.map(ev=>`
+    <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #21262d;font-size:12px">
+      <span style="color:${roleColor[ev.agent_role]||'#8b949e'};min-width:80px">${ev.agent_role}</span>
+      <span style="min-width:16px">${eventIcon[ev.event_type]||'•'}</span>
+      <span style="color:#e6edf3">${ev.event_type}</span>
+      <span style="color:#8b949e;margin-left:auto;font-size:11px">${new Date(ev.emitted_at).toLocaleTimeString()}</span>
+    </div>
+  `).join('') || '<div style="color:#8b949e;padding:16px;text-align:center">No events yet</div>';
+}
+
+load();
+</script>
+{% endblock %}

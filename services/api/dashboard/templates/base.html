@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}gemini-runtime{% endblock %}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+    nav { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+    nav a { color: #58a6ff; text-decoration: none; font-size: 13px; }
+    nav .logo { color: #e6edf3; font-weight: bold; font-size: 15px; }
+    main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 16px; color: #e6edf3; }
+    h2 { font-size: 14px; color: #8b949e; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #1f6feb22; color: #3fb950; border: 1px solid #3fb95033; }
+    .badge-red { background: #da363322; color: #f85149; border: 1px solid #f8514933; }
+    .badge-yellow { background: #e3b34122; color: #e3b341; border: 1px solid #e3b34133; }
+    .badge-blue { background: #1f6feb22; color: #58a6ff; border: 1px solid #58a6ff33; }
+    .badge-gray { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: #8b949e; font-weight: normal; padding: 8px 12px; border-bottom: 1px solid #30363d; }
+    td { padding: 8px 12px; border-bottom: 1px solid #21262d; color: #e6edf3; }
+    tr:hover td { background: #1c2128; }
+    .mono { font-family: inherit; font-size: 11px; color: #8b949e; }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stat-value { font-size: 28px; font-weight: bold; color: #e6edf3; }
+    .stat-label { font-size: 11px; color: #8b949e; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="logo">gemini-runtime</span>
+    <a href="/">sessions</a>
+    <a href="/api/v1/analytics/slo">slo</a>
+    <a href="/api/v1/analytics/tools">tools</a>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
